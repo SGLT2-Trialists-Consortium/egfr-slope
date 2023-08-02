@@ -15,7 +15,7 @@ If you'd like more information on the statistical methodology for modelling eGFR
 
 ## Dependencies
 
-To get this code to work, please install all dependencies. To install theses dependencies (if you haven't already), run the following script:
+To get this code to work, please install all dependencies. To install these dependencies (if you haven't already), run the following script:
 
 ``` r
 libs <- c("glue", "lme4", "multcomp", "simstudy", "tidyverse")
