@@ -158,8 +158,8 @@ slopes[[4]] <- get_slope(
 )
 slopes[[5]] <- get_slope(
   .model_obj = fit, .name = "Chronic: SGLT2i",
-  # Coefficients: `time` + `spline` + `trt01pn:time` + `trt`
-  .contrasts = c(0, 0, 1, 1, 1, 1)
+  # Coefficients: `time` + `spline` + `trt01pn:time` + `trt01pn:spline`
+  .contrasts = c(0, 1, 0, 1, 1, 1)
 )
 slopes[[6]] <- get_slope(
   .model_obj = fit, .name = "Chronic: SGLT2i - Placebo",
@@ -177,13 +177,13 @@ prop <- (1095.75 - 21) / 1095.75
 slopes[[7]] <- get_slope(
   .model_obj = fit, .name = "Total: Placebo",
   # Coefficients: `time` + (`prop` * `spline`)
-  .contrasts = c(0, 0, 1, prop, 0, 0)
+  .contrasts = c(0, 1, 0, prop, 0, 0)
 )
 slopes[[8]] <- get_slope(
   .model_obj = fit, .name = "Total: SGLT2i",
   # Coefficients: `time` + (`prop` * `spline`) + `trt01pn:time` + 
   # (`prop` * `trt01pn:spline`)
-  .contrasts = c(0, 0, 1, prop, 1, prop)
+  .contrasts = c(0, 1, 0, prop, 1, prop)
 )
 slopes[[9]] <- get_slope(
   .model_obj = fit, .name = "Total: SGLT2i - Placebo",

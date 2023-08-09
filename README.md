@@ -245,8 +245,8 @@ slopes[[4]] <- get_slope(
 )
 slopes[[5]] <- get_slope(
   .model_obj = fit, .name = "Chronic: SGLT2i",
-  # Coefficients: `time` + `spline` + `trt01pn:time` + `trt`
-  .contrasts = c(0, 0, 1, 1, 1, 1)
+  # Coefficients: `time` + `spline` + `trt01pn:time` + `trt01pn:spline`
+  .contrasts = c(0, 1, 0, 1, 1, 1)
 )
 slopes[[6]] <- get_slope(
   .model_obj = fit, .name = "Chronic: SGLT2i - Placebo",
@@ -264,13 +264,13 @@ prop <- (1095.75 - 21) / 1095.75
 slopes[[7]] <- get_slope(
   .model_obj = fit, .name = "Total: Placebo",
   # Coefficients: `time` + (`prop` * `spline`)
-  .contrasts = c(0, 0, 1, prop, 0, 0)
+  .contrasts = c(0, 1, 0, prop, 0, 0)
 )
 slopes[[8]] <- get_slope(
   .model_obj = fit, .name = "Total: SGLT2i",
   # Coefficients: `time` + (`prop` * `spline`) + `trt01pn:time` + 
   # (`prop` * `trt01pn:spline`)
-  .contrasts = c(0, 0, 1, prop, 1, prop)
+  .contrasts = c(0, 1, 0, prop, 1, prop)
 )
 slopes[[9]] <- get_slope(
   .model_obj = fit, .name = "Total: SGLT2i - Placebo",
@@ -291,14 +291,14 @@ print(combined)
 #> 2 Acute: SGLT2i              -66.2   -73.6   -58.9   -66.24 (-73.61 to -58.87) 3.76    -17.6   0     
 #> 3 Acute: SGLT2i - Placebo    -76.9   -87.1   -66.6   -76.86 (-87.07 to -66.64) 5.21    -14.7   0     
 #> 4 Chronic: Placebo            -3.60   -3.76   -3.45  -3.60 (-3.76 to -3.45)    0.0805  -44.8   0     
-#> 5 Chronic: SGLT2i             -3.69  -10.6     3.20  -3.69 (-10.57 to 3.20)    3.51     -1.05  0.294 
+#> 5 Chronic: SGLT2i             -1.52   -1.68   -1.36  -1.52 (-1.68 to -1.36)    0.0824  -18.5   0     
 #> 6 Chronic: SGLT2i - Placebo    2.08    1.86    2.31  2.08 (1.86 to 2.31)       0.115    18.1   0     
-#> 7 Total: Placebo              -5.49  -12.3     1.29  -5.49 (-12.28 to 1.29)    3.46     -1.59  0.112 
-#> 8 Total: SGLT2i               -4.93  -11.8     1.95  -4.93 (-11.81 to 1.95)    3.51     -1.40  0.160 
-#> 9 Total: SGLT2i - Placebo      0.569   0.321   0.817 0.57 (0.32 to 0.82)       0.127     4.49  0     
+#> 7 Total: Placebo              -3.33   -3.51   -3.15  -3.33 (-3.51 to -3.15)    0.0897  -37.1   0     
+#> 8 Total: SGLT2i               -2.76   -2.94   -2.59  -2.76 (-2.94 to -2.59)    0.0895  -30.9   0     
+#> 9 Total: SGLT2i - Placebo      0.569   0.321   0.817 0.57 (0.32 to 0.82)       0.127     4.49  0      
 ```
 
-Here are the results for acute, chronic and total slope. Some of these results above are completely implausible because of the inaccurate nature of the synthetic data, so do not expect your results to look the same. If you would like to know how to run the same analysis for subgroups, remember to consult the reprex file in the [`code`](https://github.com/ra-fletcher/smartc_egfr_slope/tree/main/code) folder.
+Here are the results for acute, chronic and total slope. Some of these results above are somewhat implausible because of the inaccurate nature of the synthetic data, so do not expect your results to look the same. If you would like to know how to run the same analysis for subgroups, remember to consult the reprex file in the [`code`](https://github.com/ra-fletcher/smartc_egfr_slope/tree/main/code) folder.
 
 ## Repository Authors
 
