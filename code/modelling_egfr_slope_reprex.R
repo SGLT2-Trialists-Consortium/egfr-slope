@@ -1,10 +1,10 @@
 #*******************************************************************************
 #
 # Project: Modelling eGFR slope
-# Date:    10-Apr-2023
-# Authors: Niels Jongs and Robert Fletcher
+# Date:    01-Dec-2023
+# Authors: Robert Fletcher and Niels Jongs
 # Purpose: Model eGFR slope using synthetic data
-# Contact: n.jongs@umcg.nl | rfletcher@georgeinstitute.org.au
+# Contact: rfletcher@georgeinstitute.org.au | n.jongs@umcg.nl
 #
 #*******************************************************************************
 
@@ -47,7 +47,7 @@ path <-
 
 # Set knot point for spline. This is 3 weeks/21 days in the CREDENCE trial, i.e.
 # the first study visit, as is the point at which the initial acute drop with
-# SGTL2 inhibition is observed. You'll want to specify this according to the 
+# SGLT2 inhibition is observed. You'll want to specify this according to the 
 # data available in your trial. For instance, in DAPA-CKD, the first study visit
 # post-randomisation is at two weeks, so `k` would be set to 14
 k <- 21
@@ -56,7 +56,7 @@ k <- 21
 # Source functions --------------------------------------------------------
 
 source(glue::glue("{path}/src/generate_synthetic_data.R"))
-source(glue::glue("{path}/src/get_slope.R"))
+source(glue::glue("{path}/src/compute_slope.R"))
 
 
 # Load data ---------------------------------------------------------------
@@ -95,22 +95,23 @@ gfr_c <- arm |>
     spline = dplyr::if_else(time >= k / 365.25, time - k / 365.25, 0)
   )
 
-# This is probably the most important aspect of the code: getting the data into
-# the correct format to fit the model. The synthetic data used in this reprex
-# should give you an idea of the format, but consult the repository README if 
-# you're unsure about anything or would like a better explanation of the details
+# This is probably the most important aspect of the code: formatting the data to
+# the required specifications to fit the model. The synthetic data used in this 
+# reprex should give you an idea of the format, but consult the repository 
+# README if you're unsure about anything or would like a more detailed
+# explanation
 
 
 # Fit model (whole population) --------------------------------------------
 
 # Fit mixed effects model with unstructured residual variance-covariance matrix
 fit <- lme4::lmer(
-  aval ~ base + time * trt01pn + spline * trt01pn - 1 + (time | usubjid), 
-  data = gfr_c
+  aval ~ base + strata + time * trt01pn + spline * trt01pn - 1 + 
+  (time | usubjid), data = gfr_c
 )
 
-# The above model is for the total trial population. Subgroup-specific 
-# analyses are covered later-on
+# The above model is for the overall trial population. Subgroup-specific 
+# analyses are covered further down
 
 # Please see the repository README if you'd like more information on 
 # specification of the model parameters
@@ -118,85 +119,23 @@ fit <- lme4::lmer(
 
 # Extract model results (whole population) --------------------------------
 
-# The below code implements a user-defined function to extract model results 
-# from the `fit` model object. You'll notice that this function (because it's
-# using `multcomp::glht()`) uses a contrast vector to get the coefficients for 
-# each required result. This method is an absolute pain for readability but is 
-# currently the most user-friendly way doing things. In brief, the contrast 
-# vector needs to be of the same length as the number of fixed effects in your 
-# model. You can find this out by running `lme4::fixef(fit)`. I've added an 
-# explanation about each constrast vector in the functions to specify which 
-# coefficients we're using at each step. If you don't change the adjustment 
-# variables (which you shouldn't have to) then there should be no reason to 
-# re-specify these contrast vectors
-
-# Create list object into which to place model results
-slopes <- list()
-
-# Acute slopes
-slopes[[1]] <- get_slope(
-  .model_obj = fit, .name = "Acute: Placebo", 
-  # Coefficients: `time`
-  .contrasts = c(0, 1, 0, 0, 0, 0)
-)
-slopes[[2]] <- get_slope(
-  .model_obj = fit, .name = "Acute: SGLT2i",
-  # Coefficients: `time` + `trt01pn:time`
-  .contrasts = c(0, 1, 0, 0, 1, 0)
-)
-slopes[[3]] <- get_slope(
-  .model_obj = fit, .name = "Acute: SGLT2i - Placebo",
-  # Coefficients: `trt01pn:time`
-  .contrasts = c(0, 0, 0, 0, 1, 0)
-)
-
-# Chronic slopes
-slopes[[4]] <- get_slope(
-  .model_obj = fit, .name = "Chronic: Placebo",
-  # Coefficients: `time` + `spline`
-  .contrasts = c(0, 1, 0, 1, 0, 0)
-)
-slopes[[5]] <- get_slope(
-  .model_obj = fit, .name = "Chronic: SGLT2i",
-  # Coefficients: `time` + `spline` + `trt01pn:time` + `trt01pn:spline`
-  .contrasts = c(0, 1, 0, 1, 1, 1)
-)
-slopes[[6]] <- get_slope(
-  .model_obj = fit, .name = "Chronic: SGLT2i - Placebo",
-  # Coefficients: `trt01pn:time` + `trt01pn:spline`
-  .contrasts = c(0, 0, 0, 0, 1, 1)
-)
-
-# Total slopes
 # Define proportion of total slope accounted-for by chronic slope (1095.75 is
 # the equivalent of 3 years in days, so we if we subtract the number of days in 
-# the acute slope, approximately 21 days or 3 weeks, then we get the proportion 
-# accounted-for by the chronic slope)
+# the acute slope, approximately 21 days or 3 weeks, we get this proportion 
 prop <- (1095.75 - 21) / 1095.75
 
-slopes[[7]] <- get_slope(
-  .model_obj = fit, .name = "Total: Placebo",
-  # Coefficients: `time` + (`prop` * `spline`)
-  .contrasts = c(0, 1, 0, prop, 0, 0)
+# Whole cohort
+all <- compute_slope(
+  .model_obj = fit, .time_var = "time", .intervention_var = "trt01pn", 
+  .spline_var = "spline", .prop = prop, .output = "all"
 )
-slopes[[8]] <- get_slope(
-  .model_obj = fit, .name = "Total: SGLT2i",
-  # Coefficients: `time` + (`prop` * `spline`) + `trt01pn:time` + 
-  # (`prop` * `trt01pn:spline`)
-  .contrasts = c(0, 1, 0, prop, 1, prop)
-)
-slopes[[9]] <- get_slope(
-  .model_obj = fit, .name = "Total: SGLT2i - Placebo",
-  # Coefficients: `trt01pn:time` + (`prop` * `trt01pn:spline`)
-  .contrasts = c(0, 0, 0, 0, 1, prop)
-)
-
-# Combine results 
-combined <- slopes |> 
-  bind_rows()
 
 
 # Fit model (GLP-1RA subgroups) -------------------------------------------
+
+# Recode baseline GLP-1RA use as factor and set `blglp1` == "Yes" as reference
+gfr_c <- gfr_c  |> 
+  mutate(blglp1 = factor(blglp1, levels = c(1, 0), labels = c("Yes", "No")))
 
 # Fit mixed effects model with unstructured residual variance-covariance matrix
 # this time with adjustment and interactions with `blglp1`
@@ -210,115 +149,8 @@ fit_subgrp <- lme4::lmer(
 
 # Extract model results (GLP-1RA subgroups) -------------------------------
 
-# Create list object into which to place model results
-slopes_subgrp <- list()
-
-# Acute slopes
-slopes_subgrp[[1]] <- get_slope(
-  .model_obj = fit_subgrp, .name = "Acute: Placebo GLP1 = Yes",
-  # Coefficients: `time`
-  .contrasts = c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+# By GLP1 use
+sg <- compute_slope(
+  .model_obj = fit_subgrp, .time_var = "time", .intervention_var = "trt01pn", 
+  .spline_var = "spline", .prop = prop, .by = "blglp1", .output = "all"
 )
-slopes_subgrp[[2]] <- get_slope(
-  .model_obj = fit_subgrp, .name = "Acute: Placebo GLP1 = No",
-  # Coefficients: `time` + `time:blglp1`
-  .contrasts = c(0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
-)
-slopes_subgrp[[3]] <- get_slope(
-  .model_obj = fit_subgrp, .name = "Acute: SGLT2i GLP1 = Yes",
-  # Coefficients: `time` + `time:trt01pn`
-  .contrasts = c(0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0)
-)
-slopes_subgrp[[4]] <- get_slope(
-  .model_obj = fit_subgrp, .name = "Acute: SGLT2i GLP1 = No",
-  # Coefficients: `time` + `time:blglp1` + `trt01pn:blglp1` + 
-  # `time:trt01pn:blglp1`
-  .contrasts = c(0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0)
-)
-slopes_subgrp[[5]] <- get_slope(
-  .model_obj = fit_subgrp, .name = "Acute: GLP1 = Yes SGLT2i - Placebo",
-  # Coefficients: `time:trt01pn`
-  .contrasts = c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0)
-)
-slopes_subgrp[[6]] <- get_slope(
-  .model_obj = fit_subgrp, .name = "Acute: GLP1 = No SGLT2i - Placebo",
-  # Coefficients: `time:trt01pn` + `time:trt01pn:blglp1`
-  .contrasts = c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0)
-)
-
-# Chronic slopes
-slopes_subgrp[[7]] <- get_slope(
-  .model_obj = fit_subgrp, .name = "Chronic: Placebo GLP1 = Yes",
-  # Coefficients: `time` + `spline`
-  .contrasts = c(0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0)
-)
-slopes_subgrp[[8]] <- get_slope(
-  .model_obj = fit_subgrp, .name = "Chronic: Placebo GLP1 = No",
-  # Coefficients: `time` + `spline` + `time:blglp1` + `spline:blglp1`
-  .contrasts = c(0, 1, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0)
-)
-slopes_subgrp[[9]] <- get_slope(
-  .model_obj = fit_subgrp, .name = "Chronic: SGLT2i GLP1 = Yes",
-  # Coefficients: `time` + `spline` + `time:trt01pn` + `trt01pn:spline`
-  .contrasts = c(0, 1, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0)
-)
-slopes_subgrp[[10]] <- get_slope(
-  .model_obj = fit_subgrp, .name = "Chronic: SGLT2i GLP1 = No",
-  # Coefficients: `time` + `spline` + `time:trt01pn` + `trt01pn:spline` + 
-  # `time:blglp1` + `spline:blglp1` + `time:trt01pn:blglp1` + 
-  # `trt01pn:spline:blglp1`
-  .contrasts = c(0, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 1)
-)
-slopes_subgrp[[11]] <- get_slope(
-  .model_obj = fit_subgrp, .name = "Chronic: GLP1 = Yes SGLT2i - Placebo",
-  # Coefficients: `time:trt01pn` + `trt01pn:spline`
-  .contrasts = c(0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0)
-)
-slopes_subgrp[[12]] <- get_slope(
-  .model_obj = fit_subgrp, .name = "Chronic: GLP1 = No SGLT2i - Placebo",
-  # Coefficients: `time:trt01pn` + `trt01pn:spline` + `time:trt01pn:blglp1` +
-  # `trt01pn:spline:blglp1`
-  .contrasts = c(0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1)
-)
-
-# Total slopes
-slopes_subgrp[[13]] <- get_slope(
-  .model_obj = fit_subgrp, .name = "Total: Placebo GLP1 = Yes",
-  # Coefficients: `time` + (`prop` * `spline`)
-  .contrasts = c(0, 1, 0, prop, 0, 0, 0, 0, 0, 0, 0, 0)
-)
-slopes_subgrp[[14]] <- get_slope(
-  .model_obj = fit_subgrp, .name = "Total: Placebo GLP1 = No",
-  # Coefficients:  `time` + (`prop` * `spline`) + `time:blglp1` + 
-  # (`prop` * `spline:blglp1`)
-  .contrasts = c(0, 1, 0, prop, 0, 0, 0, 1, prop, 0, 0, 0)
-)
-slopes_subgrp[[15]] <- get_slope(
-  .model_obj = fit_subgrp, .name = "Total: SGLT2i GLP1 = Yes",
-  # Coefficients: `time` + (`prop` * `spline`) + `time:trt01pn` + 
-  # (`prop` * `trt01pn:spline`)
-  .contrasts = c(0, 1, 0, prop, 0, 1, prop, 0, 0, 0, 0, 0)
-)
-slopes_subgrp[[16]] <- get_slope(
-  .model_obj = fit_subgrp, .name = "Total: SGLT2i GLP1 = No",
-  # Coefficients: `time` + (`prop` * `spline`) + `time:trt01pn` + 
-  # (`prop` * `trt01pn:spline`) + `time:blglp1` + 
-  # (`prop` * `spline:blglp1`) + time:trt01pn:blglp1 + 
-  # (`prop` * `trt01pn:spline:blglp1`)
-  .contrasts = c(0, 1, 0, prop, 0, 1, prop, 1, prop, 0, 1, prop)
-)
-slopes_subgrp[[17]] <- get_slope(
-  .model_obj = fit_subgrp, .name = "Total: GLP1 = Yes SGLT2i - Placebo",
-  # Coefficients: `time:trt01pn` + (`prop` * `trt01pn:spline`)
-  .contrasts = c(0, 0, 0, 0, 0, 1, prop, 0, 0, 0, 0, 0)
-)
-slopes_subgrp[[18]] <- get_slope(
-  .model_obj = fit_subgrp, .name = "Total: GLP1 = No SGLT2i - Placebo",
-  # Coefficients: `time:trt01pn` + (`prop` * `trt01pn:spline`) + 
-  # `time:trt01pn:blglp1` + (`prop` * `trt01pn:spline:blglp1`)
-  .contrasts = c(0, 0, 0, 0, 0, 1, prop, 0, 0, 0, 1, prop)
-)
-
-# Combine results 
-combined_subgrp <- slopes_subgrp |> 
-  bind_rows()
