@@ -218,7 +218,7 @@ fit <- lme4::lmer(
 
 Once you have fit your model, you then need to use linear combinations to calculate each desired result. We have written a simple function `compute_slope()` which at its core is a wrapper for `multcomp::glht()` but provides output as a `tibble` for easier manipulation and export. All you need to do is to provide the names of key variables in your model and whether you'd like to compute acute, chronic, total, or all slope types. Below is an example of computing all slope types. The function will print the coefficients that are indexed for each calculation, as well as the contrast vector that is being used compute the slope estimate.
 
-```
+``` r
 # Define proportion of total slope accounted-for by chronic slope (1095.75 is
 # the equivalent of 3 years in days, so we if we subtract the number of days in 
 # the acute slope, approximately 21 days or 3 weeks, we get this proportion 
@@ -261,7 +261,7 @@ print(all)
 
 The results above are implausible because of the inaccurate nature of the synthetic data, so do not expect your results to look the same. If you would like to know how to run the same analysis for subgroups, an appropriate model object and a `.by` argument can be specified:
 
-```
+``` r
 # Recode baseline GLP-1RA use as factor and set `blglp1` == "Yes" as reference
 gfr_c <- gfr_c  |> 
   mutate(blglp1 = factor(blglp1, levels = c(1, 0), labels = c("Yes", "No")))
