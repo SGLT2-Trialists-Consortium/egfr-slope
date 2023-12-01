@@ -216,97 +216,109 @@ fit <- lme4::lmer(
 
 ### Extracting Results
 
-Once you have fit your model, you then need to use linear combinations to calculate each desired result. We have written a simple function `compute_slope()` which is essentially a wrapper for `multcomp::glht()` but outputs results as a `tibble` for easier export. The main laborious thing about using `multcomp::glht()` is that is requires manual specification of a contrast vector so it knows which coefficients you want to use. Luckily, if you run the model in the exact same way as above with the equivalently coded variables, you should not have to edit any of the code provided. We have also added notes to specify which coefficients are being used to generate each of the results.
+Once you have fit your model, you then need to use linear combinations to calculate each desired result. We have written a simple function `compute_slope()` which at its core is a wrapper for `multcomp::glht()` but provides output as a `tibble` for easier manipulation and export. All you need to do is to provide the names of key variables in your model and whether you'd like to compute acute, chronic, total, or all slope types. Below is an example of computing all slope types. The function will print the coefficients that are indexed for each calculation, as well as the contrast vector that is being used compute the slope estimate.
 
-``` r
-# Source function to extract slope results
-source(glue::glue("{path}/src/get_slope.R"))
-
-# Create list object into which to place model results
-slopes <- list()
-
-# Acute slopes
-slopes[[1]] <- get_slope(
-  .model_obj = fit, .name = "Acute: Placebo", 
-  # Coefficients: `time`
-  .contrasts = c(0, 1, 0, 0, 0, 0)
-)
-slopes[[2]] <- get_slope(
-  .model_obj = fit, .name = "Acute: SGLT2i",
-  # Coefficients: `time` + `trt01pn:time`
-  .contrasts = c(0, 1, 0, 0, 1, 0)
-)
-slopes[[3]] <- get_slope(
-  .model_obj = fit, .name = "Acute: SGLT2i - Placebo",
-  # Coefficients: `trt01pn:time`
-  .contrasts = c(0, 0, 0, 0, 1, 0)
-)
-
-# Chronic slopes
-slopes[[4]] <- get_slope(
-  .model_obj = fit, .name = "Chronic: Placebo",
-  # Coefficients: `time` + `spline`
-  .contrasts = c(0, 1, 0, 1, 0, 0)
-)
-slopes[[5]] <- get_slope(
-  .model_obj = fit, .name = "Chronic: SGLT2i",
-  # Coefficients: `time` + `spline` + `trt01pn:time` + `trt01pn:spline`
-  .contrasts = c(0, 1, 0, 1, 1, 1)
-)
-slopes[[6]] <- get_slope(
-  .model_obj = fit, .name = "Chronic: SGLT2i - Placebo",
-  # Coefficients: `trt01pn:time` + `trt01pn:spline`
-  .contrasts = c(0, 0, 0, 0, 1, 1)
-)
-
-# Total slopes
+```
 # Define proportion of total slope accounted-for by chronic slope (1095.75 is
 # the equivalent of 3 years in days, so we if we subtract the number of days in 
-# the acute slope, approximately 21 days or 3 weeks, then we get the proportion 
-# accounted-for by the chronic slope)
+# the acute slope, approximately 21 days or 3 weeks, we get this proportion 
 prop <- (1095.75 - 21) / 1095.75
 
-slopes[[7]] <- get_slope(
-  .model_obj = fit, .name = "Total: Placebo",
-  # Coefficients: `time` + (`prop` * `spline`)
-  .contrasts = c(0, 1, 0, prop, 0, 0)
+# eGFR slope for the whole cohort
+all <- compute_slope(
+  .model_obj = fit, .time_var = "time", .intervention_var = "trt01pn", .spline_var = "spline", 
+  .prop = prop, .output = "all"
 )
-slopes[[8]] <- get_slope(
-  .model_obj = fit, .name = "Total: SGLT2i",
-  # Coefficients: `time` + (`prop` * `spline`) + `trt01pn:time` + 
-  # (`prop` * `trt01pn:spline`)
-  .contrasts = c(0, 1, 0, prop, 1, prop)
-)
-slopes[[9]] <- get_slope(
-  .model_obj = fit, .name = "Total: SGLT2i - Placebo",
-  # Coefficients: `trt01pn:time` + (`prop` * `trt01pn:spline`)
-  .contrasts = c(0, 0, 0, 0, 1, prop)
-)
+#> Slopes computed: Total
+#> Output collated in dataframe extension of type `tibble`.
+#> --------------------------------------------------------
+#> Acute slope
+#> Control
+#> Linear combination: `time`
+#> Contrast vector: c(0, 0, 0, 0, 1, 0, 0, 0, 0)
+#> Active
+#> Linear combination: `time` + `time:trt01pn`
+#> Contrast vector: c(0, 0, 0, 0, 1, 0, 0, 1, 0)
+#> Active - Control
+#> Linear combination: `time:trt01pn`
+#> Contrast vector: c(0, 0, 0, 0, 0, 0, 0, 1, 0)
 
-# Combine results 
-combined <- slopes |> 
-  bind_rows()
-  
 # Print results
-print(combined)
-#> # A tibble: 9 × 8
-#>   name                      estimate     lci     uci result                        se t_value p_value
-#>   <chr>                        <dbl>   <dbl>   <dbl> <chr>                      <dbl>   <dbl>   <dbl>
-#> 1 Acute: Placebo              10.6     3.53   17.7   10.61 (3.53 to 17.69)     3.61      2.94  0.0033
-#> 2 Acute: SGLT2i              -66.2   -73.6   -58.9   -66.24 (-73.61 to -58.87) 3.76    -17.6   0     
-#> 3 Acute: SGLT2i - Placebo    -76.9   -87.1   -66.6   -76.86 (-87.07 to -66.64) 5.21    -14.7   0     
-#> 4 Chronic: Placebo            -3.60   -3.76   -3.45  -3.60 (-3.76 to -3.45)    0.0805  -44.8   0     
-#> 5 Chronic: SGLT2i             -1.52   -1.68   -1.36  -1.52 (-1.68 to -1.36)    0.0824  -18.5   0     
-#> 6 Chronic: SGLT2i - Placebo    2.08    1.86    2.31  2.08 (1.86 to 2.31)       0.115    18.1   0     
-#> 7 Total: Placebo              -3.33   -3.51   -3.15  -3.33 (-3.51 to -3.15)    0.0897  -37.1   0     
-#> 8 Total: SGLT2i               -2.76   -2.94   -2.59  -2.76 (-2.94 to -2.59)    0.0895  -30.9   0     
-#> 9 Total: SGLT2i - Placebo      0.569   0.321   0.817 0.57 (0.32 to 0.82)       0.127     4.49  0      
+print(all)
+#> # A tibble: 9 × 9
+#>   slope   group            estimate     lci     uci result                        se t_value p_value
+#>   <chr>   <chr>               <dbl>   <dbl>   <dbl> <chr>                      <dbl>   <dbl>   <dbl>
+#> 1 Acute   Control           -50.5   -57.9   -43.2   -50.55 (-57.88 to -43.21) 3.74    -13.5   0     
+#> 2 Acute   Active            -66.0   -73.3   -58.6   -65.95 (-73.29 to -58.62) 3.74    -17.6   0     
+#> 3 Acute   Active - Control  -15.4   -25.8    -5.03  -15.41 (-25.78 to -5.03)  5.29     -2.91  0.0036
+#> 4 Chronic Control            -2.46   -2.60   -2.32  -2.46 (-2.60 to -2.32)    0.0714  -34.4   0     
+#> 5 Chronic Active             -1.54   -1.68   -1.40  -1.54 (-1.68 to -1.40)    0.0711  -21.6   0     
+#> 6 Chronic Active - Control    0.922   0.724   1.12  0.92 (0.72 to 1.12)       0.101     9.15  0     
+#> 7 Total   Control            -3.38   -3.54   -3.23  -3.38 (-3.54 to -3.23)    0.0794  -42.6   0     
+#> 8 Total   Active             -2.77   -2.93   -2.62  -2.77 (-2.93 to -2.62)    0.0792  -35.0   0     
+#> 9 Total   Active - Control    0.608   0.389   0.828 0.61 (0.39 to 0.83)       0.112     5.42  0      
 ```
 
-Here are the results for acute, chronic and total slope. Some of these results above are somewhat implausible because of the inaccurate nature of the synthetic data, so do not expect your results to look the same. If you would like to know how to run the same analysis for subgroups, remember to consult the reprex file in the [`code`](https://github.com/ra-fletcher/smartc_egfr_slope/tree/main/code) folder.
+The results above are implausible because of the inaccurate nature of the synthetic data, so do not expect your results to look the same. If you would like to know how to run the same analysis for subgroups, an appropriate model object and a `.by` argument can be specified:
+
+```
+# Recode baseline GLP-1RA use as factor and set `blglp1` == "Yes" as reference
+gfr_c <- gfr_c  |> 
+  mutate(blglp1 = factor(blglp1, levels = c(1, 0), labels = c("Yes", "No")))
+
+# Fit mixed effects model with unstructured residual variance-covariance matrix
+# this time with adjustment and interactions with `blglp1`
+fit_subgrp <- lme4::lmer(
+  aval ~ base + time * trt01pn + spline * trt01pn + time * blglp1 +
+  spline * blglp1 + trt01pn * blglp1 + time * trt01pn * blglp1 + 
+  spline * trt01pn * blglp1 - 1 + (time | usubjid), 
+  data = gfr_c
+)
+
+# By GLP1 use (acute only)
+sg <- compute_slope(
+  .model_obj = fit_subgrp, .time_var = "time", .intervention_var = "trt01pn", 
+  .spline_var = "spline", .prop = prop, .by = "blglp1", .output = "acute"
+)
+#> Slopes computed: Acute
+#> Output collated in dataframe extension of type `tibble`.
+#> --------------------------------------------------------
+#> Acute slope
+#> Control, blglp1 = Yes
+#> Linear combination: `time`
+#> Contrast vector: c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+#> Active, blglp1 = Yes
+#> Linear combination: `time` + `time:trt01pn`
+#> Contrast vector: c(0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0)
+#> Active - Control, blglp1 = Yes
+#> Linear combination: `time:trt01pn`
+#> Contrast vector: c(0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0)
+#> Control, blglp1 = No
+#> Linear combination: `time` + `time:blglp1No`
+#> Contrast vector: c(0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+#> Active, blglp1 = No
+#> Linear combination: `time` + `time:blglp1No` + `trt01pn:blglp1No` + `time:trt01pn:blglp1No`
+#> Contrast vector: c(0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0)
+#> Active - Control, blglp1 = No
+#> Linear combination: `time:trt01pn` + `time:trt01pn:blglp1No`
+#> Contrast vector: c(0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0)
+
+# Print results
+print(sg)
+#> # A tibble: 6 × 11
+#>   slope group            subgroup subgroup_cat estimate    lci    uci result                        se t_value p_value
+#>   <chr> <chr>            <chr>    <chr>           <dbl>  <dbl>  <dbl> <chr>                      <dbl>   <dbl>   <dbl>
+#> 1 Acute Control          blglp1   Yes             -47.4  -86.1  -8.69 -47.41 (-86.12 to -8.69)   19.8   -2.40   0.0164
+#> 2 Acute Active           blglp1   Yes             -28.2  -62.9   6.56 -28.19 (-62.94 to 6.56)    17.7   -1.59   0.112 
+#> 3 Acute Active - Control blglp1   Yes              19.2  -32.8  71.2  19.22 (-32.80 to 71.24)    26.5    0.724  0.469 
+#> 4 Acute Control          blglp1   No              -50.7  -58.1 -43.2  -50.66 (-58.14 to -43.19)   3.81 -13.3    0     
+#> 5 Acute Active           blglp1   No              -85.0 -135.  -34.7  -85.03 (-135.35 to -34.71) 25.7   -3.31   0.0009
+#> 6 Acute Active - Control blglp1   No              -17.1  -27.6  -6.47 -17.06 (-27.65 to -6.47)    5.40  -3.16   0.0016
+```
+
 
 ## Repository Authors
 
-**Niels Jongs, PhD** - [n.jongs@umcg.nl](mailto:n.jongs@umcg.nl?subject=Inquiry) | University Medical Center Groningen, Groningen, Netherlands
+**Robert Fletcher, MSc (Oxon)** - [rfletcher@georgeinstitute.org.au](mailto:rfletcher@georgeinstitute.org.au?subject=Inquiry) | The George Institute for Global Health, Sydney, Australia | British Heart Foundation Cardiovascular Epidemiology Unit, Department of Public Health and Primary Care, University of Cambridge, Cambridge UK
 
-**Robert Fletcher, MSc (Oxon)** - [rfletcher@georgeinstitute.org.au](mailto:rfletcher@georgeinstitute.org.au?subject=Inquiry) | The George Institute for Global Health, Sydney, Australia
+**Niels Jongs, PhD** - [n.jongs@umcg.nl](mailto:n.jongs@umcg.nl?subject=Inquiry) | University Medical Center Groningen, Groningen, Netherlands
