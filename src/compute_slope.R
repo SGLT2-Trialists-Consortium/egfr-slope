@@ -848,4 +848,3 @@ compute_slope <- function(.model_obj,
       
     }
   }
-}

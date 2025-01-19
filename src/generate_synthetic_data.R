@@ -1,13 +1,61 @@
-#' Generate synthetic data for modelling eGFR slope
-#' 
+#' @title
+#' Generate Synthetic Datasets for eGFR Slope Analysis
+#'
+#' @description
+#' Creates two synthetic datasets, one representing baseline information and the
+#' other repeated eGFR measurements over time. These data are generated for 
+#' demonstration purposes (e.g., modeling eGFR slope in hypothetical SGLT2 
+#' inhibitor trials).
+#'
 #' @details
-#' `generate_synthetic_data()` generates two synthetic datasets for the use of 
-#' this reproducible example to model eGFR slope in SGLT2 inhibitor trials.
-#' 
-#' @param .table A character string to select which table to specify which table
-#' to generate. Options include: "baseline" or "follow-up".
-#' 
-#' @return data frame extension of type `tibble`.
+#' The baseline dataset mimics a simplified version of an `ADSL`-like table, 
+#' while the follow-up dataset contains repeated eGFR measurements, similar to 
+#' an `ADLBM` structure. Each dataset includes synthetic variables for treatment 
+#' assignment, baseline eGFR, and random follow-up times. Some artificial
+#' missingness is introduced to reflect real-world trial data challenges.
+#'
+#' @param .table A character string indicating which dataset to return. 
+#'   Possible values:
+#'   \itemize{
+#'     \item \code{"baseline"} – returns the baseline dataset (mimicking 
+#'       `ADSL`).
+#'     \item \code{"follow-up"} – returns the follow-up dataset (mimicking 
+#'       repeated eGFR data in `ADLBM`).
+#'   }
+#'
+#' @return A \code{tibble} containing synthetic data.  
+#'   \describe{
+#'     \item{\code{"baseline"}}{Baseline demographics and eGFR-related variables 
+#'       for 5000 simulated subjects.}
+#'     \item{\code{"follow-up"}}{Repeated eGFR measurements and associated time 
+#'       points (e.g., \code{avisitn}, \code{ady}).}
+#'   }
+#'
+#' @section Notes:
+#' \itemize{
+#'   \item This function installs \pkg{simstudy} and \pkg{tidyverse} if not 
+#'         already present, then uses \code{simstudy} to generate random values 
+#'         that approximate marginal distributions observed in typical SGLT2 
+#'         inhibitor trials.
+#'   \item Subject IDs are prefixed with \code{"id"} for clarity. 
+#'   \item Minor amounts of missing data and duplicated rows are introduced to
+#'         mimic real clinical trial data structures.
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' # Generate baseline dataset
+#' bl_data <- generate_synthetic_data(.table = "baseline")
+#'
+#' # Generate follow-up dataset
+#' fu_data <- generate_synthetic_data(.table = "follow-up")
+#'
+#' # Check structure
+#' head(bl_data)
+#' head(fu_data)
+#' }
+#'
+#' @export
 
 generate_synthetic_data <- function(.table) {
   
