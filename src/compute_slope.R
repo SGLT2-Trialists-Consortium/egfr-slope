@@ -1,29 +1,73 @@
-#' Compute eGFR slope results from a mixed model object
+#' @title 
+#'   Compute eGFR Slope Results from a "Two Slope" Mixed Model
 #' 
-#' @details 
-#' `compute_slope()` computes eGFR slope results from a "two slope" mixed model 
-#' object using linear combinations of the coefficients. The function is at its 
-#' core a wrapper for `multcomp::glht()` which calculates linear combinations. 
-#' `multcomp::glht()` ordinarily requires a contrast vector to be specified
-#' manually, but given this wrapper requires only the names of key variables in
-#' in your model. See the repository README for more details.
+#' @description
+#' This function computes acute, chronic, or total eGFR slope estimates (or all
+#' three) based on a "two slope" mixed model (e.g., from `lme4::lmer()` or 
+#' `nlme::lme()`). It wraps \code{multcomp::glht()} to generate linear 
+#' combinations of model coefficients, removing the need to specify contrast 
+#' vectors manually. You only need to provide the names of key model variables.
 #' 
-#' @param .model_obj A linear model object, i.e. `lme4::lmer()` or
-#' `nlme::lme()`.
-#' @param .intervention_var A character string specifying the name of your 
-#' treatment or intervention. This variable must be binary.
-#' @param .time_var A character string specifying the name of your time 
-#' variable.
-#' @param .spline_var A character string specifying the name of your spline
-#' variable.
-#' @param .by Optional argument that is a character string specifying the name
-#' of your subgroup variable. This must be a factor variable.
-#' @param .prop A numeric vector that specifies the proportion of the total
-#' slope accounted-for by the chronic slope.
-#' @param .output A character string specifying your desired output: acute, 
-#' chronic, total, or all three slope types.
+#' @details
+#' - **Acute slope** typically represents the initial, short-term change in eGFR.
+#' - **Chronic slope** reflects the longer-term eGFR trajectory post-acute phase.
+#' - **Total slope** is a weighted combination of acute and chronic slopes, with
+#'   weighting defined by \code{.prop}.
+#'   
+#' For subgroup analyses, specify a factor variable in \code{.by} to obtain 
+#' separate slope estimates by level (e.g., men vs. women, or levels of baseline
+#' eGFR). The function will also perform a chi-squared heterogeneity test to 
+#' assess differences across subgroups.
 #' 
-#' @return Data frame extension of type `tibble`. 
+#' @param .model_obj An \emph{fitted} two-slope model object, typically an
+#'   object from \code{lme4::lmer()} or \code{nlme::lme()}.
+#' @param .time_var A character string specifying the \strong{time} variable in 
+#'   \code{.model_obj}, representing the linear term for time.
+#' @param .intervention_var A character string specifying the binary treatment 
+#'   or intervention variable in \code{.model_obj}.
+#' @param .spline_var A character string specifying the \strong{spline} variable
+#'   used to model the breakpoint between acute and chronic slope.
+#' @param .by (Optional) A character string specifying the name of a factor 
+#'   variable for subgroup analyses. When provided, separate slopes are computed 
+#'   for each subgroup level, along with a heterogeneity test.
+#' @param .prop (Optional) A numeric value indicating the proportion of the 
+#'   \strong{total} slope allocated to the chronic phase. This is used to form 
+#'   linear combinations for the total slope (when \code{.output = "total"} or 
+#'   \code{"all"}).
+#' @param .output A character string specifying the slope(s) to return. Valid 
+#'   options: \code{"acute"}, \code{"chronic"}, \code{"total"}, or \code{"all"}.
+#' 
+#' @return A tibble with columns for slope type, group (control, active, or 
+#'   difference), estimates, confidence intervals, and p-values. If \code{.by} 
+#'   is supplied with multiple subgroup levels, the output also includes 
+#'   subgroup identifiers and heterogeneity test results.
+#'   
+#' @section Warning:
+#' This function assumes a specific model structure (e.g., an acute phase 
+#' spline and interaction terms for treatment). Ensure the naming of variables
+#' in \code{.model_obj} matches the parameters provided here.
+#' 
+#' 
+#' @examples
+#' \dontrun{
+#' # Fit a two-slope model with lme4 or nlme, then:
+#' results <- compute_slope(
+#'   .model_obj        = fit,
+#'   .time_var         = "time",
+#'   .intervention_var = "trt01pn",
+#'   .spline_var       = "spline",
+#'   .prop             = 0.21
+#'   .output           = "all"
+#' )
+#' }
+#'
+#' @seealso
+#' \itemize{
+#'   \item \code{\link{multcomp::glht}} for details on computing linear contrasts.
+#'   \item \code{\link{lme4::lmer}} or \code{\link{nlme::lme}} for model fitting.
+#' }
+#'
+#' @export
 
 compute_slope <- function(.model_obj,
                           .intervention_var,
