@@ -354,7 +354,7 @@ binary_subgroups <- compute_slope(
 #> p-value: 0.180375112239819
 
 # Print results
-print(sg)
+print(binary_subgroups)
 #> # A tibble: 6 × 11
 #>   slope group            subgroup subgroup_cat estimate    lci    uci result                        se t_value p_value
 #>   <chr> <chr>            <chr>    <chr>           <dbl>  <dbl>  <dbl> <chr>                      <dbl>   <dbl>   <dbl>
@@ -366,21 +366,9 @@ print(sg)
 #> 6 Acute Active - Control blglp1   No              -17.1  -27.6  -6.47 -17.06 (-27.65 to -6.47)    5.40  -3.16   0.0016
 ```
 
-## Other types of model
+## Other Model Types
 
-``` r
-
-# test <- nlme::lme(
-#   aval ~ base + strata + gfr_grp + trt01pn + time + spline + time*trt01pn +
-#   spline*trt01pn + time*gfr_grp + spline*gfr_grp + trt01pn*gfr_grp +
-#   time*trt01pn*gfr_grp + spline*trt01pn*gfr_grp + -1, # Model
-#   random = list(usubjid = pdSymm(form= ~ 1 + time)), # Unstructured covariance matrix
-#   na.action=na.omit, data = gfr_c, method  = "REML",
-#   control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, opt = "optim", optimMethod = "CG")
-# )
-
-```
-
+If you prefer to use other functions for your linear mixed model, for instance `nlme::lme()`, the `compute_slope()` function will also support this.
 
 ## Repository Authors
 
