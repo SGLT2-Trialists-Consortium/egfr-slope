@@ -243,7 +243,7 @@ compute_slope <- function(.model_obj,
     message(blck("--------------------------------------------------------"))
     message(bblck("Heterogeneity test"))
     message(blck("Chi-square statistic: "), bred(chi))
-    message(blck("p-value:"), bred(pval))
+    message(blck("p-value: "), bred(pval))
   }
   
   # Get fixed effects and names of fixed effects
@@ -304,13 +304,13 @@ compute_slope <- function(.model_obj,
       total_d[sxip] <- total_d[sxip] * .prop
     }
 
-    # Slope type
-    slope <- "Total"
     # Groups
     grp <- c("Control", "Active", "Active - Control")
     
     # Produce results for acute slope only
     if (.output %in% c("Acute", "ACUTE", "acute")) {
+      # Slope type
+      slope <- rep("Acute", 3)
       # List of contrast vectors
       vec <- list(acute_0, acute_1, acute_d)
       # Output list
@@ -325,7 +325,7 @@ compute_slope <- function(.model_obj,
         solo[[i]] <- process(res, .slope = slope[i], .group = grp[i])
       }
       solo <- dplyr::bind_rows(solo)
-      display_header(.output_produced = slope)
+      display_header(.output_produced = slope[1])
       # Acute slope calculations
       message(bred("Acute slope"))
       display_lc(.title = "Control", .fe = .time_var, .cv = acute_0)
@@ -333,6 +333,8 @@ compute_slope <- function(.model_obj,
       display_lc(.title = "Active - Control", .fe = txi, .cv = acute_d)
       return(solo)
     } else if (.output %in% c("Chronic", "CHRONIC", "chronic")) {
+      # Slope type
+      slope <- rep("Chronic", 3)
       # List of contrast vectors
       vec <- list(chronic_0, chronic_1, chronic_d)
       # Output list
@@ -347,7 +349,7 @@ compute_slope <- function(.model_obj,
         solo[[i]] <- process(res, .slope = slope[i], .group = grp[i])
       }
       solo <- dplyr::bind_rows(solo)
-      display_header(.output_produced = slope)
+      display_header(.output_produced = slope[1])
       # Chronic slope calculations
       message(bred("Chronic slope"))
       display_lc(
@@ -360,7 +362,10 @@ compute_slope <- function(.model_obj,
       display_lc(
         .title = "Active - Control", .fe = c(txi, sxi), .cv = chronic_d
       )
+      return(solo)
     } else if (.output %in% c("Total", "TOTAL", "total")) {
+      # Slope type
+      slope <- rep("Total", 3)
       # List of contrast vectors
       vec <- list(total_0, total_1, total_d)
       # Output list
@@ -375,7 +380,7 @@ compute_slope <- function(.model_obj,
         solo[[i]] <- process(res, .slope = slope[i], .group = grp[i])
       }
       solo <- dplyr::bind_rows(solo)
-      display_header(.output_produced = slope)
+      display_header(.output_produced = slope[1])
       # Total slope calculations
       message(bred("Total slope"))
       display_lc(
@@ -390,15 +395,16 @@ compute_slope <- function(.model_obj,
         .title = "Active - Control", .fe = c(txi, sxi), .cv = total_d, 
         .prop = deparse(substitute(.prop)), .multiply = 2
       )
+      return(solo)
     # Produce results for all slope types (acute, chronic, and total)
     } else if (.output %in% c("All", "ALL", "all")) {
+      # Slope types
+      slope <- rep(c("Acute", "Chronic", "Total"), each = 3)
       # List of contrast vectors
       vec <- list(
         acute_0, acute_1, acute_d, chronic_0, chronic_1, chronic_d, total_0, 
         total_1, total_d
       )
-      # Slope types
-      slope <- rep(c("Acute", "Chronic", "Total"), each = 3)
       # Groups
       grp <- rep(c("Control", "Active", "Active - Control"), times = 3)
       all <- list()
