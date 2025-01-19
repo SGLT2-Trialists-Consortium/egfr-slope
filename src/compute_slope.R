@@ -1,5 +1,5 @@
 #' @title 
-#'   Compute eGFR Slope Results from a "Two Slope" Mixed Model
+#' Compute eGFR Slope Results from a "Two Slope" Mixed Model
 #' 
 #' @description
 #' This function computes acute, chronic, or total eGFR slope estimates (or all
