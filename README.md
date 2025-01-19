@@ -1,4 +1,4 @@
-# Modelling eGFR Slope <a href='https://www.georgeinstitute.org'><img src="figs/logo/smartc.png" align="right" height="60" /></a>
+# Modelling eGFR Slope <a href='https://www.georgeinstitute.org'><img src="figs/logo/smartc.png" align="right" height="40" /></a>
  
 <!-- badges: start -->
 ![Languages](https://img.shields.io/badge/Languages-R-6498d3)
