@@ -5,8 +5,9 @@
 # Temporary and binary files
 .DS_Store
 
-# Deprecated functions folder
+# Deprecated and experimental functions folders
 src/deprecated/
+src/experimental/
 
 # Session Data files
 .RData
