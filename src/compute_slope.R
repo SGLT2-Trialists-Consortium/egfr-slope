@@ -52,6 +52,32 @@ compute_slope <- function(.model_obj,
     y * pos_neg
   }
   
+  # Needed later on to match contrast vectors to linear combinations
+  match_vars <- function(vars, indicator) {
+    # Check if the length of the vars and indicator vectors are the same
+    if (length(vars) != length(indicator)) {
+      stop("Length of vars and indicator vectors must be the same.")
+    }
+    
+    # Select variables that correspond to 1s in the indicator vector
+    selected_vars <- vars[indicator == 1]
+    
+    return(selected_vars)
+  }
+  
+  # To get levels of factor variable for subgroup analyses
+  get_model_frame <- function(.model_obj) {
+    if (inherits(.model_obj, "lmerMod")) {
+      # For lme4 models
+      return(.model_obj@frame)
+    } else if (inherits(.model_obj, "lme")) {
+      # For lme models
+      return(nlme::getData(.model_obj))
+    } else {
+      stop("Unsupported model type. Please provide an lme4 or lme model object.")
+    }
+  }
+  
   process <- function(.multcomp_obj, 
                       .slope, 
                       .group,
@@ -120,12 +146,20 @@ compute_slope <- function(.model_obj,
     main <- bblck("Slopes computed: ")
     if (.output_produced == "Acute") {
       message(main, bred(.output_produced))
+      message(blck("Output collated in dataframe extension of type `tibble`."))
+      message(blck("--------------------------------------------------------"))
     } else if (.output_produced == "Chronic") {
       message(main, bred(.output_produced))
+      message(blck("Output collated in dataframe extension of type `tibble`."))
+      message(blck("--------------------------------------------------------"))
     } else if (.output_produced == "Total") {
       message(main, bred(.output_produced))
+      message(blck("Output collated in dataframe extension of type `tibble`."))
+      message(blck("--------------------------------------------------------"))
     } else if (.output_produced == "All") {
       message(main, bred("Acute, Chronic, and Total"))
+      message(blck("Output collated in dataframe extension of type `tibble`."))
+      message(blck("--------------------------------------------------------"))
     }
   }
   
@@ -159,6 +193,59 @@ compute_slope <- function(.model_obj,
     )
   }
   
+  # Function to get heterogeneity p-value for difference across subgroups
+  get_heterogeneity <- function(.result) {
+    
+    result <- .result[grep("[-]", .result$group), ]
+    
+    # Create matrix from the estimates
+    bhat <- result$estimate
+    
+    # Create matrix from the standard errors
+    sevec <- result$se
+    
+    # Matrix multiplication
+    smat <- diag(sevec^2)
+    
+    # Define matrix according to the number of subgroups
+    
+    # Define the length of the vector
+    n <- nrow(result) - 1
+    
+    # Initialise empty matrix with n rows and n columns
+    l <- matrix(0, nrow = n, ncol = n + 1)
+    
+    # Loop through the positions of the vector
+    for (i in 1:n) {
+      # Create a vector of 0s of length n
+      vec <- c(-1, rep(0, n))
+      
+      # Set the i-th position to 1
+      vec[i + 1] <- 1
+      
+      # Add the vector as the i-th row of the matrix
+      l[i, ] <- vec
+    }
+    
+    # Calculate w
+    w <- t(l %*% bhat) %*% solve(l %*% smat %*% t(l)) %*% (l %*% bhat)
+    
+    # Calculate degrees of freedom (df)
+    df <- nrow(l)
+    
+    # Calculate p-value using the chi-square distribution
+    pval <- 1 - pchisq(w, df)
+    
+    # Assign Chi-square statistic
+    chi <- w
+    
+    # Print the results
+    message(blck("--------------------------------------------------------"))
+    message(bblck("Heterogeneity test"))
+    message(blck("Chi-square statistic: "), bred(chi))
+    message(blck("p-value:"), bred(pval))
+  }
+  
   # Get fixed effects and names of fixed effects
   # Fixed effects
   fe <- nlme::fixed.effects(.model_obj)
@@ -167,9 +254,29 @@ compute_slope <- function(.model_obj,
   
   # Names of interactions required for all calculations
   # Treatment and time
-  txi <- names(fe[grepl(paste0("^", .time_var, ":", .intervention_var, "$|^", .intervention_var, ":", .time_var, "$"), nfe)])
+  txi <- names(
+    fe[
+      grepl(
+        paste0(
+          "^", .time_var, ":", .intervention_var, "$|^", .intervention_var, 
+          ":", .time_var, "$"
+        ), 
+        nfe
+      )
+    ]
+  )
   # Treatment and spline
-  sxi <- names(fe[grepl(paste0("^", .spline_var, ":", .intervention_var, "$|^", .intervention_var, ":", .spline_var, "$"), nfe)])
+  sxi <- names(
+    fe[
+      grepl(
+        paste0(
+          "^", .spline_var, ":", .intervention_var, "$|^", .intervention_var, 
+          ":", .spline_var, "$"
+        ),
+        nfe
+      )
+    ]
+  )
   
   if (missing(.by)) {
     # Position of coefficients in the contrast vector that require 
@@ -219,8 +326,6 @@ compute_slope <- function(.model_obj,
       }
       solo <- dplyr::bind_rows(solo)
       display_header(.output_produced = slope)
-      message(blck("Output collated in dataframe extension of type `tibble`."))
-      message(blck("--------------------------------------------------------"))
       # Acute slope calculations
       message(bred("Acute slope"))
       display_lc(.title = "Control", .fe = .time_var, .cv = acute_0)
@@ -243,8 +348,6 @@ compute_slope <- function(.model_obj,
       }
       solo <- dplyr::bind_rows(solo)
       display_header(.output_produced = slope)
-      message(blck("Output collated in dataframe extension of type `tibble`."))
-      message(blck("--------------------------------------------------------"))
       # Chronic slope calculations
       message(bred("Chronic slope"))
       display_lc(
@@ -273,8 +376,6 @@ compute_slope <- function(.model_obj,
       }
       solo <- dplyr::bind_rows(solo)
       display_header(.output_produced = slope)
-      message(blck("Output collated in dataframe extension of type `tibble`."))
-      message(blck("--------------------------------------------------------"))
       # Total slope calculations
       message(bred("Total slope"))
       display_lc(
@@ -312,8 +413,6 @@ compute_slope <- function(.model_obj,
       }
       all <- dplyr::bind_rows(all)
       display_header(.output_produced = "All")
-      message(blck("Output collated in dataframe extension of type `tibble`."))
-      message(blck("--------------------------------------------------------"))
       # Acute slope calculations
       message(bred("Acute slope"))
       display_lc(.title = "Control", .fe = .time_var, .cv = acute_0)
@@ -347,88 +446,255 @@ compute_slope <- function(.model_obj,
       )
       return(all)
     }
-    } else if (!missing(.by) & length(levels(eval(summary(.model_obj)$call$data)[[.by]])) == 2) {
-    # Highest level of the subgroup variable (required for regex below)
-    ref <- levels(.model_obj@frame[[.by]])[2]
-    # Other level
-    oth <- levels(.model_obj@frame[[.by]])[1]
+  } else if (!missing(.by) & length(levels(eval(summary(.model_obj)$call$data)[[.by]])) >= 2) {
+    # Levels of the subgroup variable
+    levels_by <- levels(get_model_frame(.model_obj)[[.by]])
+
+    # Function to get interaction names
+    get_int <- function(level, var_type) {
+      rgx <- paste0(
+        "^", var_type, ":", .by, level, "$|^", .by, level, ":", var_type, "$"
+      )
+      names(fe[grepl(rgx, nfe)])
+    }
     
-    # Names of subgroup interactions
-    # Treatment and subgroup
-    sgxi <- names(fe[grepl(paste0("^", .intervention_var, ":", .by, ref, "$|^", .by, ref, ":", .intervention_var, "$"), nfe)])
-    # Time and subgroup
-    sgxt <- names(fe[grepl(paste0("^", .time_var, ":", .by, ref, "$|^", .by, ref, ":", .time_var, "$"), nfe)])
-    # Spline and subgroup
-    sgxs <- names(fe[grepl(paste0("^", .spline_var, ":", .by, ref, "$|^", .by, ref, ":", .time_var, "$"), nfe)])
+    # List of variable types for obtaining interactions
+    var_types <- list(
+      intervention = .intervention_var, time = .time_var, spline = .spline_var
+    )
+    
+    # Lists for each interaction type
+    list_int <- list()
+    
+    for (i in seq_along(levels_by)) {
+      
+      sgxi_val <- get_int(levels_by[i], var_types$intervention)
+      sgxt_val <- get_int(levels_by[i], var_types$time)
+      sgxs_val <- get_int(levels_by[i], var_types$spline)
+      
+      # Add to the list of lists only if the values are not NULL or empty
+      if ((!is.null(sgxi_val) && length(sgxi_val) > 0) ||
+          (!is.null(sgxt_val) && length(sgxt_val) > 0) ||
+          (!is.null(sgxs_val) && length(sgxs_val) > 0)) {
+        
+        list_int[[i]] <- list(
+          sgxi = sgxi_val, sgxt = sgxt_val, sgxs = sgxs_val
+        )
+      }
+    }
+    
+    # Remove NULL values if they exist in the list of interactions
+    list_int <- Filter(Negate(is.null), list_int)
+    
     # 3-way interactions
     int3 <- names(fe[grepl(":[a-z|A-Z|0-9].+:", nfe)])
     # Time and treatment and subgroup
-    sgxtxi <- int3[grepl("time", int3)]
+    sgxtxi <- as.list(int3[grepl(.time_var, int3)])
     # Treatment and spline and subgroup
-    sgxsxi <- int3[grepl("spline", int3)]
+    sgxsxi <- as.list(int3[grepl(.spline_var, int3)])
     
-    # Position of coefficients in the contrast vector that require 
-    # multiplication for total slope
-    sp <- which(names(fixed.effects(.model_obj)) == .spline_var)
-    sxip <- which(names(fixed.effects(.model_obj)) == sxi)
-    sgxsp <- which(names(fixed.effects(.model_obj)) == sgxs)
-    sgxsxip <- which(names(fixed.effects(.model_obj)) == sgxsxi)
+    # Add 3-way interactions to the main list
+    for (i in 1:length(list_int)) {
+      list_int[[i]]$sgxtxi <- sgxtxi[[i]]
+      list_int[[i]]$sgxsxi <- sgxsxi[[i]]
+    }
     
-    # Acute, subgroup yes
-    acute_0_sgy <- as.integer(nfe %in% .time_var)
-    acute_1_sgy <- as.integer(nfe %in% c(.time_var, txi))
-    acute_d_sgy <- as.integer(nfe %in% c(txi))
+    # Create list for values that contain the .spline_var string (need). This is
+    # to then create a list of all the positions of coefficients in the contrast 
+    # vector that require multiplication for total slope
+    list_spl <- list()
     
-    # Acute, subgroup no
-    acute_0_sgn <- as.integer(nfe %in% c(.time_var, sgxt))
-    acute_1_sgn <- as.integer(nfe %in% c(.time_var, sgxt, sgxi, sgxtxi))
-    acute_d_sgn <- as.integer(nfe %in% c(txi, sgxtxi))
+    # Loop through each element in list_int
+    for (i in seq_along(list_int)) {
+      
+      # Check each sub-list in list_int (e.g., sgxi, sgxt, sgxs)
+      for (sublist_name in names(list_int[[i]])) {
+        sublist_values <- list_int[[i]][[sublist_name]]
+        
+        if (any(grepl(.spline_var, sublist_values))) {
+          # Add the sublist to the new list if it contains the name of the 
+          # spline variable
+          list_spl[[length(list_spl) + 1]] <- sublist_values
+        }
+      }
+    }
     
-    # Chronic, subgroup yes
-    chronic_0_sgy <- as.integer(nfe %in% c(.time_var, .spline_var))
-    chronic_1_sgy <- as.integer(nfe %in% c(.time_var, .spline_var, txi, sxi))
-    chronic_d_sgy <- as.integer(nfe %in% c(txi, sxi))
+    # Definitive spline list
+    list_spl <- append(list(.spline_var, sxi), list_spl)
     
-    # Chronic, subgroup no
-    chronic_0_sgn <- as.integer(nfe %in% c(.time_var, .spline_var, sgxt, sgxs))
-    chronic_1_sgn <- as.integer(nfe %in% c(.time_var, .spline_var, txi, sxi, sgxt, sgxs, sgxtxi, sgxsxi))
-    chronic_d_sgn <- as.integer(nfe %in% c(txi, sxi, sgxtxi, sgxsxi))
+    # Get the positions of these fixed effects/coefficients
+    list_spl_pos <- list()
+    for (i in 1:length(list_spl)) {
+      val <- which(names(fixed.effects(.model_obj)) == list_spl[[i]])
+      list_spl_pos[[i]] <- val
+      names(list_spl_pos)[i] <- list_spl[[i]]
+    }
+    
+    # Create contrast vectors for acute slope
+    acute_contrasts_list <- list()
+    for (i in 1:length(list_int)) {
+      acute_0 <- as.integer(nfe %in% c(.time_var, list_int[[i]]$sgxt))
+      acute_1 <- as.integer(
+        nfe %in% c(.time_var, txi, list_int[[i]]$sgxt, list_int[[i]]$sgxtxi)
+      )
+      acute_d <- as.integer(nfe %in% c(txi, list_int[[i]]$sgxtxi))
+      
+      acute <- list(acute_0, acute_1, acute_d)
+      names(acute) <- c("acute_0", "acute_1", "acute_d")
+      
+      acute_contrasts_list[[i]] <- acute
+      names(acute_contrasts_list)[i] <- paste0("sg", as.character(i))
+    }
+    
+    # Contrasts for the reference group
+    ref_contrasts_list <- list(
+      list(
+        acute_0 = as.integer(nfe %in% c(.time_var)),
+        acute_1 = as.integer(nfe %in% c(.time_var, txi)),
+        acute_d = as.integer(nfe %in% c(txi))
+      ) 
+    )
+    names(ref_contrasts_list) <- paste0("sg", length(acute_contrasts_list) + 1)
+    
+    # Bind all together
+    acute_contrasts_list <- append(acute_contrasts_list, ref_contrasts_list)
+    
+    # Create contrast vectors for chronic slope
+    chronic_contrasts_list <- list()
+    for (i in 1:length(list_int)) {
+      chronic_0 <- as.integer(
+        nfe %in% c(
+          .time_var, .spline_var, list_int[[i]]$sgxt, list_int[[i]]$sgxs
+        )
+      )
+      chronic_1 <- as.integer(
+        nfe %in% c(
+          .time_var, .spline_var, txi, sxi, list_int[[i]]$sgxt, 
+          list_int[[i]]$sgxs, list_int[[i]]$sgxtxi, list_int[[i]]$sgxsxi
+        )
+      )
+      chronic_d <- as.integer(
+        nfe %in% c(txi, sxi, list_int[[i]]$sgxtxi, list_int[[i]]$sgxsxi)
+      )
+      
+      chronic <- list(chronic_0, chronic_1, chronic_d)
+      names(chronic) <- c("chronic_0", "chronic_1", "chronic_d")
+      
+      chronic_contrasts_list[[i]] <- chronic
+      names(chronic_contrasts_list)[i] <- paste0("sg", as.character(i))
+    }
+    
+    # Contrasts for the reference group
+    ref_contrasts_list <- list(
+      list(
+        chronic_0 = as.integer(nfe %in% c(.time_var, .spline_var)),
+        chronic_1 = as.integer(nfe %in% c(.time_var, .spline_var, txi, sxi)),
+        chronic_d = as.integer(nfe %in% c(txi, sxi))
+      ) 
+    )
+    names(ref_contrasts_list) <- paste0(
+      "sg", length(chronic_contrasts_list) + 1
+    )
+    
+    # Bind all together
+    chronic_contrasts_list <- append(chronic_contrasts_list, ref_contrasts_list)
     
     if (!missing(.prop)) {
-      # Total, subgroup yes
-      total_0_sgy <- as.integer(nfe %in% c(.time_var, .spline_var))
-      total_0_sgy[sp] <- total_0_sgy[sp] * .prop
-      total_1_sgy <- as.integer(nfe %in% c(.time_var, .spline_var, txi, sxi)) 
-      total_1_sgy[c(sp, sxip)] <- total_1_sgy[c(sp, sxip)] * .prop
-      total_d_sgy <- as.integer(nfe %in% c(txi, sxi))
-      total_d_sgy[sxip] <- total_d_sgy[sxip] * .prop
-    
-      # Total, subgroup no
-      total_0_sgn <- as.integer(nfe %in% c(.time_var, .spline_var, sgxt, sgxs))
-      total_0_sgn[c(sp, sgxsp)] <- total_0_sgn[c(sp, sgxsp)] * .prop
-      total_1_sgn <- as.integer(nfe %in% c(.time_var, .spline_var, txi, sxi, sgxt, sgxs, sgxtxi, sgxsxi))
-      total_1_sgn[c(sp, sxip, sgxsp, sgxsxip)] <- total_1_sgn[c(sp, sxip, sgxsp, sgxsxip)] * .prop
-      total_d_sgn <- as.integer(nfe %in% c(txi, sxi, sgxtxi, sgxsxi))
-      total_d_sgn[c(sxip, sgxsxip)] <- total_d_sgn[c(sxip, sgxsxip)] * .prop
+      # Create contrast vectors for total slope
+      total_contrasts_list <- list()
+      for (i in 1:length(list_int)) {
+        total_0 <- as.integer(
+          nfe %in% c(
+            .time_var, .spline_var, list_int[[i]]$sgxt, list_int[[i]]$sgxs
+          )
+        )
+        total_0[
+          c(list_spl_pos[[.spline_var]], 
+            list_spl_pos[[list_int[[i]]$sgxs]])
+        ] <- total_0[
+          c(list_spl_pos[[.spline_var]], 
+            list_spl_pos[[list_int[[i]]$sgxs]])
+        ] * .prop
+        total_1 <- as.integer(
+          nfe %in% c(
+            .time_var, .spline_var, txi, sxi, list_int[[i]]$sgxt, 
+            list_int[[i]]$sgxs, list_int[[i]]$sgxtxi, list_int[[i]]$sgxsxi
+          )
+        )
+        total_1[
+          c(list_spl_pos[[.spline_var]], 
+            list_spl_pos[[sxi]], 
+            list_spl_pos[[list_int[[i]]$sgxs]], 
+            list_spl_pos[[list_int[[i]]$sgxsxi]])
+        ] <- total_1[
+          c(list_spl_pos[[.spline_var]], 
+            list_spl_pos[[sxi]], 
+            list_spl_pos[[list_int[[i]]$sgxs]], 
+            list_spl_pos[[list_int[[i]]$sgxsxi]])
+        ] * .prop
+        total_d <- as.integer(
+          nfe %in% c(txi, sxi, list_int[[i]]$sgxtxi, list_int[[i]]$sgxsxi)
+        )
+        total_d[
+          c(list_spl_pos[[sxi]], 
+            list_spl_pos[[list_int[[i]]$sgxsxi]])
+        ] <- total_d[
+          c(list_spl_pos[[sxi]], 
+            list_spl_pos[[list_int[[i]]$sgxsxi]])
+        ] * .prop
+        
+        total <- list(total_0, total_1, total_d)
+        names(total) <- c("total_0", "total_1", "total_d")
+        
+        total_contrasts_list[[i]] <- total
+        names(total_contrasts_list)[i] <- paste0("sg", as.character(i))
+      }
+      
+      # Contrasts for the reference group
+      ref_contrasts_list <- list(
+        list(
+          total_0 = as.integer(nfe %in% c(.time_var, .spline_var)),
+          total_1 = as.integer(nfe %in% c(.time_var, .spline_var, txi, sxi)),
+          total_d = as.integer(nfe %in% c(txi, sxi))
+        ) 
+      )
+      # Position of coefficients in the contrast vector that require 
+      # multiplication
+      sp <- which(names(fixed.effects(.model_obj)) == .spline_var)
+      sxip <- which(names(fixed.effects(.model_obj)) == sxi)
+      
+      # Multiply by `.prop`
+      ref_contrasts_list[[1]]$total_0[sp] <- 
+        ref_contrasts_list[[1]]$total_0[sp] * .prop
+      ref_contrasts_list[[1]]$total_1[c(sp, sxip)] <-
+        ref_contrasts_list[[1]]$total_1[c(sp, sxip)] * .prop
+      ref_contrasts_list[[1]]$total_d[sxip] <- 
+        ref_contrasts_list[[1]]$total_d[sxip] * .prop
+      # Rename
+      names(ref_contrasts_list) <- 
+        paste0("sg", length(total_contrasts_list) + 1)
+      
+      # Bind all together
+      total_contrasts_list <- append(total_contrasts_list, ref_contrasts_list)
     }
     
     # Groups
-    grp <- rep(c("Control", "Active", "Active - Control"), times = 2)
-    subgrp <- rep(.by, times = 6)
-    subgrp_cat <- rep(c(oth, ref), each = 3)
+    reps <- length(levels_by) * 3
+    
+    grp <- rep(c("Control", "Active", "Active - Control"), times = reps)
+    subgrp <- rep(.by, times = reps)
+    subgrp_cat <- 
+      rep(c(levels_by[-1], levels_by[1]), each = reps / length(levels_by))
     
     # Produce results for acute slope only
     if (.output %in% c("Acute", "ACUTE", "acute")) {
       # List of contrast vectors
-      vec <- list(
-        acute_0_sgy, acute_1_sgy, acute_d_sgy, acute_0_sgn, acute_1_sgn,
-        acute_d_sgn
-      )
+      vec <- unlist(acute_contrasts_list, recursive = FALSE)
       # Slope type
-      slope <- rep("Acute", times = 6)
+      slope <- rep("Acute", times = reps)
       # Output list
       solo <- list()
-
+      
       # Loop over contrast vectors to produce results
       for (i in 1:length(vec)) {
         res <- summary(
@@ -442,28 +708,25 @@ compute_slope <- function(.model_obj,
       }
       solo <- dplyr::bind_rows(solo)
       display_header(.output_produced = slope[1])
-      message(blck("Output collated in dataframe extension of type `tibble`."))
-      message(blck("--------------------------------------------------------"))
-      # Acute slope calculations
       message(bred("Acute slope"))
-      display_lc(.title = paste0("Control, ", .by, " = ", oth), .fe = .time_var, .cv = acute_0_sgy)
-      display_lc(.title = paste0("Active, ", .by, " = ", oth), .fe = c(.time_var, txi), .cv = acute_1_sgy)
-      display_lc(.title = paste0("Active - Control, ", .by, " = ", oth), .fe = txi, .cv = acute_d_sgy)
-      display_lc(.title = paste0("Control, ", .by, " = ", ref), .fe = c(.time_var, sgxt), .cv = acute_0_sgn)
-      display_lc(.title = paste0("Active, ", .by, " = ", ref), .fe = c(.time_var, sgxt, sgxi, sgxtxi), .cv = acute_1_sgn)
-      display_lc(.title = paste0("Active - Control, ", .by, " = ", ref), .fe = c(txi, sgxtxi), .cv = acute_d_sgn)
+      # Acute slope calculations
+      for (i in 1:length(vec)) {
+        linear_combination <- match_vars(nfe, vec[[i]])
+        display_lc(
+          .title = paste0(grp[i], ", ", .by, " = ", subgrp_cat[i]), 
+          .fe = linear_combination, .cv = vec[[i]]
+        )
+      }
+      get_heterogeneity(solo)
       return(solo)
     } else if (.output %in% c("Chronic", "CHRONIC", "chronic")) {
       # List of contrast vectors
-      vec <- list(
-        chronic_0_sgy, chronic_1_sgy, chronic_d_sgy, chronic_0_sgn, chronic_1_sgn,
-        chronic_d_sgn
-      )
+      vec <- unlist(chronic_contrasts_list, recursive = FALSE)
       # Slope type
-      slope <- rep("Chronic", times = 6)
+      slope <- rep("Chronic", times = reps)
       # Output list
       solo <- list()
-
+      
       # Loop over contrast vectors to produce results
       for (i in 1:length(vec)) {
         res <- summary(
@@ -478,24 +741,24 @@ compute_slope <- function(.model_obj,
       solo <- dplyr::bind_rows(solo)
       display_header(.output_produced = slope[1])
       message(bred("Chronic slope"))
-      display_lc(.title = paste0("Control, ", .by, " = ", oth), .fe = c(.time_var, .spline_var), .cv = chronic_0_sgy)
-      display_lc(.title = paste0("Active, ", .by, " = ", oth), .fe = c(.time_var, .spline_var, txi, sxi), .cv = chronic_1_sgy)
-      display_lc(.title = paste0("Active - Control, ", .by, " = ", oth), .fe = c(txi, sxi), .cv = chronic_d_sgy)
-      display_lc(.title = paste0("Control, ", .by, " = ", ref), .fe = c(.time_var, .spline_var, sgxt, sgxs), .cv = chronic_0_sgn)
-      display_lc(.title = paste0("Active, ", .by, " = ", ref), .fe = c(.time_var, .spline_var, txi, sxi, sgxt, sgxs, sgxtxi, sgxsxi), .cv = chronic_1_sgn)
-      display_lc(.title = paste0("Active - Control, ", .by, " = ", ref), .fe = c(txi, sxi, sgxtxi, sgxsxi), .cv = chronic_d_sgn)
+      # Chronic slope calculations
+      for (i in 1:length(vec)) {
+        linear_combination <- match_vars(nfe, vec[[i]])
+        display_lc(
+          .title = paste0(grp[i], ", ", .by, " = ", subgrp_cat[i]), 
+          .fe = linear_combination, .cv = vec[[i]]
+        )
+      }
+      get_heterogeneity(solo)
       return(solo)
     } else if (.output %in% c("Total", "TOTAL", "total")) {
       # List of contrast vectors
-      vec <- list(
-        total_0_sgy, total_1_sgy, total_d_sgy, total_0_sgn, total_1_sgn,
-        total_d_sgn
-      )
+      vec <- unlist(total_contrasts_list, recursive = FALSE)
       # Slope type
-      slope <- rep("Total", times = 6)
+      slope <- rep("Total", times = reps)
       # Output list
       solo <- list()
-
+      
       # Loop over contrast vectors to produce results
       for (i in 1:length(vec)) {
         res <- summary(
@@ -510,121 +773,29 @@ compute_slope <- function(.model_obj,
       solo <- dplyr::bind_rows(solo)
       display_header(.output_produced = slope[1])
       message(bred("Total slope"))
-      display_lc(
-        .title = paste0("Control, ", .by, " = ", oth),
-        .fe = c(.time_var, .spline_var), .cv = total_0_sgy,
-        .prop = deparse(substitute(.prop)), .multiply = 2
-      )
-      display_lc(
-        .title = paste0("Active, ", .by, " = ", oth),
-        .fe = c(.time_var, .spline_var, txi, sxi), .cv = total_1_sgy,
-        .prop = deparse(substitute(.prop)), .multiply = c(2, 4)
-      )
-      display_lc(
-        .title = paste0("Active - Placebo, ", .by, " = ", oth),
-        .fe = c(txi, sxi), .cv = total_d_sgy,
-        .prop = deparse(substitute(.prop)), .multiply = 2
-      )
-      display_lc(
-        .title = paste0("Control, ", .by, " = ", oth),
-        .fe = c(.time_var, .spline_var, sgxt, sgxs), .cv = total_0_sgn,
-        .prop = deparse(substitute(.prop)), .multiply = c(2, 4)
-      )
-      display_lc(
-        .title = paste0("Active, ", .by, " = ", oth),
-        .fe = c(.time_var, .spline_var, txi, sxi, sgxt, sgxs, sgxtxi, sgxsxi),
-        .cv = total_1_sgn, .prop = deparse(substitute(.prop)),
-        .multiply = c(2, 4, 6, 8)
-      )
-      display_lc(
-        .title = paste0("Active - Placebo, ", .by, " = ", oth),
-        .fe = c(txi, sxi, sgxtxi, sgxsxi), .cv = total_d_sgn,
-        .prop = deparse(substitute(.prop)), .multiply = c(2, 4)
-      )
-      return(solo)
-    } else if (.output %in% c("All", "ALL", "all")) {
-      # List of contrast vectors
-      vec <- list(
-        acute_0_sgy, acute_1_sgy, acute_d_sgy, acute_0_sgn, acute_1_sgn,
-        acute_d_sgn, chronic_0_sgy, chronic_1_sgy, chronic_d_sgy, chronic_0_sgn, 
-        chronic_1_sgn, chronic_d_sgn, total_0_sgy, total_1_sgy, total_d_sgy, 
-        total_0_sgn, total_1_sgn, total_d_sgn
-      )
-      # Slope type
-      slope <- rep(c("Acute", "Chronic", "Total"), each = 6)
-      # Groups
-      grp <- rep(c("Control", "Active", "Active - Control"), times = 6)
-      subgrp <- rep(.by, times = 18)
-      subgrp_cat <- rep(c(oth, oth, oth, ref, ref, ref), times = 3)
-      
-      # Output list
-      all <- list()
-
-      # Loop over contrast vectors to produce results
+      # Total slope calculations
+      # Make binary vector to remove all the `.prop` changes so as to index the
+      # coefficients and get the linear combinations
+      vec_bi <- lapply(vec, function(x) ifelse(x != 0, 1, 0))
       for (i in 1:length(vec)) {
-        res <- summary(
-          multcomp::glht(.model_obj, linfct = rbind("slope" = vec[[i]]))
-        )
-        # Make tibble
-        all[[i]] <- process(
-          res, .slope = slope[i], .group = grp[i], .subgroup = subgrp[i],
-          .subgroup_cat = subgrp_cat[i]
+        linear_combination <- match_vars(nfe, vec_bi[[i]])
+        # Where to insert multiplication terms into the linear combination
+        # (corresponds to all selected coefficients which include `.spline_var`)
+        mult <- grep(.spline_var, match_vars(nfe, vec_bi[[i]]))
+        display_lc(
+          .title = paste0(grp[i], ", ", .by, " = ", subgrp_cat[i]), 
+          .fe = linear_combination, .cv = vec[[i]], 
+          .prop = deparse(substitute(.prop)), .multiply = mult
         )
       }
-      all <- dplyr::bind_rows(all)
-      display_header(.output_produced = "All")
-      message(blck("Output collated in dataframe extension of type `tibble`."))
-      message(blck("--------------------------------------------------------"))
-      # Acute slope calculations
-      message(bred("Acute slope"))
-      display_lc(.title = paste0("Control, ", .by, " = ", oth), .fe = .time_var, .cv = acute_0_sgy)
-      display_lc(.title = paste0("Active, ", .by, " = ", oth), .fe = c(.time_var, txi), .cv = acute_1_sgy)
-      display_lc(.title = paste0("Active - Control, ", .by, " = ", oth), .fe = txi, .cv = acute_d_sgy)
-      display_lc(.title = paste0("Control, ", .by, " = ", ref), .fe = c(.time_var, sgxt), .cv = acute_0_sgn)
-      display_lc(.title = paste0("Active, ", .by, " = ", ref), .fe = c(.time_var, sgxt, sgxi, sgxtxi), .cv = acute_1_sgn)
-      display_lc(.title = paste0("Active - Control, ", .by, " = ", ref), .fe = c(txi, sgxtxi), .cv = acute_d_sgn)
-      # Chronic slope calculations
-      message(bred("Chronic slope"))
-      display_lc(.title = paste0("Control, ", .by, " = ", oth), .fe = c(.time_var, .spline_var), .cv = chronic_0_sgy)
-      display_lc(.title = paste0("Active, ", .by, " = ", oth), .fe = c(.time_var, .spline_var, txi, sxi), .cv = chronic_1_sgy)
-      display_lc(.title = paste0("Active - Control, ", .by, " = ", oth), .fe = c(txi, sxi), .cv = chronic_d_sgy)
-      display_lc(.title = paste0("Control, ", .by, " = ", ref), .fe = c(.time_var, .spline_var, sgxt, sgxs), .cv = chronic_0_sgn)
-      display_lc(.title = paste0("Active, ", .by, " = ", ref), .fe = c(.time_var, .spline_var, txi, sxi, sgxt, sgxs, sgxtxi, sgxsxi), .cv = chronic_1_sgn)
-      display_lc(.title = paste0("Active - Control, ", .by, " = ", ref), .fe = c(txi, sxi, sgxtxi, sgxsxi), .cv = chronic_d_sgn)
-      # Total slope calculations
-      message(bred("Total slope"))
-      display_lc(
-        .title = paste0("Control, ", .by, " = ", oth),
-        .fe = c(.time_var, .spline_var), .cv = total_0_sgy,
-        .prop = deparse(substitute(.prop)), .multiply = 2
+      get_heterogeneity(solo)
+      return(solo)
+    } else if (.output %in% c("All", "ALL", "all")) {
+    
+      message(
+        "The functionality to compute all slopes at once when `.by` is specified has not yet been implemented into this version of the function."
       )
-      display_lc(
-        .title = paste0("Active, ", .by, " = ", oth),
-        .fe = c(.time_var, .spline_var, txi, sxi), .cv = total_1_sgy,
-        .prop = deparse(substitute(.prop)), .multiply = c(2, 4)
-      )
-      display_lc(
-        .title = paste0("Active - Placebo, ", .by, " = ", oth),
-        .fe = c(txi, sxi), .cv = total_d_sgy,
-        .prop = deparse(substitute(.prop)), .multiply = 2
-      )
-      display_lc(
-        .title = paste0("Control, ", .by, " = ", oth),
-        .fe = c(.time_var, .spline_var, sgxt, sgxs), .cv = total_0_sgn,
-        .prop = deparse(substitute(.prop)), .multiply = c(2, 4)
-      )
-      display_lc(
-        .title = paste0("Active, ", .by, " = ", oth),
-        .fe = c(.time_var, .spline_var, txi, sxi, sgxt, sgxs, sgxtxi, sgxsxi),
-        .cv = total_1_sgn, .prop = deparse(substitute(.prop)),
-        .multiply = c(2, 4, 6, 8)
-      )
-      display_lc(
-        .title = paste0("Active - Placebo, ", .by, " = ", oth),
-        .fe = c(txi, sxi, sgxtxi, sgxsxi), .cv = total_d_sgn,
-        .prop = deparse(substitute(.prop)), .multiply = c(2, 4)
-      )
-      return(all)
+      
     }
   }
 }
