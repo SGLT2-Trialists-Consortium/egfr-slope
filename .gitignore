@@ -5,6 +5,9 @@
 # Temporary and binary files
 .DS_Store
 
+# Deprecated functions older
+"/src/deprecated"
+
 # Session Data files
 .RData
 .RDataTmp
