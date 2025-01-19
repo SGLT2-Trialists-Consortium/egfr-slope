@@ -12,9 +12,9 @@ This code is still in development and is therefore subject to major change over 
 
 ## Updates
 
-```
-19 January 2025
+### 19 January 2025
 
+```
 The `compute_slope()` function now supports two new major features:
 
 1. Subgroups: You can compute eGFR slope for any number of subgroups (previously limited to 
@@ -30,13 +30,13 @@ The `compute_slope()` function now supports two new major features:
 
 This repository provides a step-by-step guide to standardised modelling of estimated glomerular filtration rate (eGFR) slope in clinical trials, developed by the SGLT2 inhibitor Meta-Analysis Cardio-Renal Trialists Consortium (SMART-C). An accompanying reproducible example (reprex) using synthetically-generated data is also provided in the [`code`](https://github.com/ra-fletcher/smartc_egfr_slope/tree/main/code) folder.
 
-A quick note about the reprex: its primary goal is to demonstrate how to structure the data, specify the model, and extract results for acute, chronic, and total eGFR slopes. We generated the synthetic data using the [`simstudy`](https://kgoldfeld.github.io/simstudy/) R package, ensuring they share the same marginal distributions as the CREDENCE trial. Precisely emulating every variable relationship within longitudinal data is complex, so the model outputs here won’t perfectly match real clinical trial results. The main focus is to illustrate the underlying methodology.
+A quick note about the reprex: its primary goal is to demonstrate how to structure the data, specify the model, and extract results for acute, chronic, and total eGFR slopes. We generated the synthetic data used in the reprex using the [`simstudy`](https://kgoldfeld.github.io/simstudy/) R package, ensuring they share the same marginal distributions as the CREDENCE trial. Precisely emulating every variable relationship within longitudinal data is complex, so the model outputs here won’t perfectly match real clinical trial results. The main focus is to illustrate the underlying methodology.
 
 For further details on the statistical methods behind modelling of eGFR slope, please see the original publication here: [Vonesh et al., 2019](https://onlinelibrary.wiley.com/doi/10.1002/sim.8282).
 
 ## Dependencies
 
-To get this code to work, please install all dependencies. To install these dependencies (if you haven't already), run the following script:
+Make sure all required dependencies are installed before running the code. If you haven’t done so already, run the following script:
 
 ``` r
 libs <- c("glue", "lme4", "multcomp", "simstudy", "tidyverse")
@@ -80,13 +80,13 @@ Below is an overview of the folders in this repository that are actively synchro
 
 ## Guide
 
-The aim of this repository is to provide a systematic guide to modelling eGFR slope using R. This guide, enclosed within the repository `README`, will provide a visual guide to:
+The goal of this repository is to provide a structured guide to modeling eGFR slope in R. Within this `README`, you’ll find:
 
-1. Setting-up the data into the required format
-2. Specifying the model
-3. Extracting the relevant model results (including acute slope, chronic slope, and total slope)
+1. Instructions for preparing data in the required format
+2. Steps to specify and fit the model
+3. Methods to extract key results (acute, chronic, and total slope)
 
-This guide will demonstrate how to model eGFR slope for the total trial population. If you'd like to know how to apply this code in subgroups, please see the reprex in the [`code`](https://github.com/ra-fletcher/smartc_egfr_slope/tree/main/code) folder.
+This guide focuses on modeling eGFR slope for the overall trial population. For a more detailed focus on subgroup analyses, refer to the reproducible example (reprex) in the `code` folder.
 
 ### Data
 
@@ -233,20 +233,24 @@ fit <- lme4::lmer(
 
 ### Extracting Results
 
-Once you have fit your model, you then need to use linear combinations to calculate each desired result. We have written a simple function `compute_slope()` which at its core is a wrapper for `multcomp::glht()` but provides output as a `tibble` for easier manipulation and export. All you need to do is to provide the names of key variables in your model and whether you'd like to compute acute, chronic, total, or all slope types. Below is an example of computing all slope types. The function will print the coefficients that are indexed for each calculation, as well as the contrast vector that is being used compute the slope estimate.
+Once you have fit your model, you then need to use linear combinations to calculate each desired result. We have written a function `compute_slope()` which at its core is a wrapper for `multcomp::glht()` but provides output as a `tibble` for easier manipulation and export. All you need to do is to provide the names of key variables in your model and whether you'd like to compute acute, chronic, total, or all slope types. Below is an example of computing all slope types. The function will print the coefficients that are indexed for each calculation, as well as the contrast vector that is being used compute the slope estimate.
 
 ``` r
 # Define proportion of total slope accounted-for by chronic slope (1095.75 is
 # the equivalent of 3 years in days, so we if we subtract the number of days in 
 # the acute slope, approximately 21 days or 3 weeks, we get this proportion 
-prop <- (1095.75 - 21) / 1095.75
+prop <- (1095.75 - k) / 1095.75
 
 # eGFR slope for the whole cohort
 all <- compute_slope(
-  .model_obj = fit, .time_var = "time", .intervention_var = "trt01pn", .spline_var = "spline", 
-  .prop = prop, .output = "all"
+  .model_obj = fit, 
+  .time_var = "time", 
+  .intervention_var = "trt01pn",
+  .spline_var = "spline", 
+  .prop = prop, 
+  .output = "all"
 )
-#> Slopes computed: Total
+#> Slopes computed: Acute, Chronic, and Total
 #> Output collated in dataframe extension of type `tibble`.
 #> --------------------------------------------------------
 #> Acute slope
@@ -259,6 +263,26 @@ all <- compute_slope(
 #> Active - Control
 #> Linear combination: `time:trt01pn`
 #> Contrast vector: c(0, 0, 0, 0, 0, 0, 0, 1, 0)
+#> Chronic slope
+#> Control
+#> Linear combination: `time` + `spline`
+#> Contrast vector: c(0, 0, 0, 0, 1, 0, 1, 0, 0)
+#> Active
+#> Linear combination: `time` + `spline` + `time:trt01pn` + `trt01pn:spline`
+#> Contrast vector: c(0, 0, 0, 0, 1, 0, 1, 1, 1)
+#> Active - Control
+#> Linear combination: `time:trt01pn` + `trt01pn:spline`
+#> Contrast vector: c(0, 0, 0, 0, 0, 0, 0, 1, 1)
+#> Total slope
+#> Control
+#> Linear combination: `time` + (`prop` * `spline`)
+#> Contrast vector: c(0, 0, 0, 0, 1, 0, 0.98, 0, 0)
+#> Active
+#> Linear combination: `time` + (`prop` * `spline`) + `time:trt01pn` + (`prop` * `trt01pn:spline`)
+#> Contrast vector: c(0, 0, 0, 0, 1, 0, 0.98, 1, 0.98)
+#> Active - Control
+#> Linear combination: `time:trt01pn` + (`prop` * `trt01pn:spline`)
+#> Contrast vector: c(0, 0, 0, 0, 0, 0, 0, 1, 0.98)
 
 # Print results
 print(all)
@@ -285,40 +309,49 @@ gfr_c <- gfr_c  |>
 
 # Fit mixed effects model with unstructured residual variance-covariance matrix
 # this time with adjustment and interactions with `blglp1`
-fit_subgrp <- lme4::lmer(
+fit_binary <- lme4::lmer(
   aval ~ base + time * trt01pn + spline * trt01pn + time * blglp1 +
   spline * blglp1 + trt01pn * blglp1 + time * trt01pn * blglp1 + 
   spline * trt01pn * blglp1 - 1 + (time | usubjid), 
   data = gfr_c
 )
 
-# By GLP1 use (acute only)
-sg <- compute_slope(
-  .model_obj = fit_subgrp, .time_var = "time", .intervention_var = "trt01pn", 
-  .spline_var = "spline", .prop = prop, .by = "blglp1", .output = "acute"
+# Compute eGFR slope by binary subgroups (baseline GLP-1RA use; acute only)
+binary_subgroups <- compute_slope(
+  .model_obj = fit_binary, 
+  .time_var = "time", 
+  .intervention_var = "trt01pn", 
+  .spline_var = "spline", 
+  .prop = prop, 
+  .by = "blglp1", # `.by` argument specified with subgroup variable
+  .output = "acute"
 )
 #> Slopes computed: Acute
 #> Output collated in dataframe extension of type `tibble`.
 #> --------------------------------------------------------
 #> Acute slope
-#> Control, blglp1 = Yes
-#> Linear combination: `time`
-#> Contrast vector: c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-#> Active, blglp1 = Yes
-#> Linear combination: `time` + `time:trt01pn`
-#> Contrast vector: c(0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0)
-#> Active - Control, blglp1 = Yes
-#> Linear combination: `time:trt01pn`
-#> Contrast vector: c(0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0)
 #> Control, blglp1 = No
 #> Linear combination: `time` + `time:blglp1No`
-#> Contrast vector: c(0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+#> Contrast vector: c(0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
 #> Active, blglp1 = No
-#> Linear combination: `time` + `time:blglp1No` + `trt01pn:blglp1No` + `time:trt01pn:blglp1No`
-#> Contrast vector: c(0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0)
+#> Linear combination: `time` + `time:trt01pn` + `time:blglp1No` + `time:trt01pn:blglp1No`
+#> Contrast vector: c(0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0)
 #> Active - Control, blglp1 = No
 #> Linear combination: `time:trt01pn` + `time:trt01pn:blglp1No`
-#> Contrast vector: c(0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0)
+#> Contrast vector: c(0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0)
+#> Control, blglp1 = Yes
+#> Linear combination: `time`
+#> Contrast vector: c(0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+#> Active, blglp1 = Yes
+#> Linear combination: `time` + `time:trt01pn`
+#> Contrast vector: c(0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0)
+#> Active - Control, blglp1 = Yes
+#> Linear combination: `time:trt01pn`
+#> Contrast vector: c(0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0)
+#> --------------------------------------------------------
+#> Heterogeneity test
+#> Chi-square statistic: 1.79453072639104
+#> p-value: 0.180375112239819
 
 # Print results
 print(sg)
