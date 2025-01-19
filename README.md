@@ -17,8 +17,13 @@ This code is still in development and is therefore subject to major change over 
 ```
 The `compute_slope()` function now supports two new major features:
 
-1. Subgroups: You can compute eGFR slope for any number of subgroups (previously limited to two). To do this, ensure your subgroup variable is coded correctly (see guidance below) and pass it via the .by argument.
-2. Heterogeneity Testing: The function now calculates a chi-squared statistic and p-value for comparing slopes across subgroups. These results are displayed in the console message when you run the function. We plan to refine and expand this feature in the coming months.
+1. Subgroups: You can compute eGFR slope for any number of subgroups (previously limited to 
+   two). To do this, ensure your subgroup variable is coded correctly (see guidance below) 
+   and pass it via the .by argument.
+2. Heterogeneity Testing: The function now calculates a chi-squared statistic and p-value 
+   for comparing slopes across subgroups. These results are displayed in the console
+   message when you run the function. We plan to refine and expand this feature in the 
+   coming months.
 ```
 
 ## Overview
