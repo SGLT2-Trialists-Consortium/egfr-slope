@@ -10,6 +10,14 @@
 
 This code is still in development and is therefore subject to major change over the coming weeks.
 
+## Updates
+
+### 19th January 2025
+The compute_slope() function now supports two new major features:
+
+1 Subgroups: You can compute eGFR slope for any number of subgroups (previously limited to two). To do this, ensure your subgroup variable is coded correctly (see guidance below) and pass it via the .by argument.
+2. Heterogeneity Testing: The function now calculates a chi-squared statistic and p-value for comparing slopes across subgroups. These results are displayed in the console message when you run the function. We plan to refine and expand this feature in the coming months.
+
 ## Overview
 
 This repository provides a step-by-step guide to standardised modelling of estimated glomerular filtration rate (eGFR) slope in trials included in the SGLT2 inhibitor Meta-Analysis Cardio-Renal Trialists Consortium (SMART-C). An accompanying reproducible example (reprex) using synthetically-generated data is also provided in the [`code`](https://github.com/ra-fletcher/smartc_egfr_slope/tree/main/code) folder.
@@ -314,6 +322,21 @@ print(sg)
 #> 4 Acute Control          blglp1   No              -50.7  -58.1 -43.2  -50.66 (-58.14 to -43.19)   3.81 -13.3    0     
 #> 5 Acute Active           blglp1   No              -85.0 -135.  -34.7  -85.03 (-135.35 to -34.71) 25.7   -3.31   0.0009
 #> 6 Acute Active - Control blglp1   No              -17.1  -27.6  -6.47 -17.06 (-27.65 to -6.47)    5.40  -3.16   0.0016
+```
+
+## Other types of model
+
+``` r
+
+# test <- nlme::lme(
+#   aval ~ base + strata + gfr_grp + trt01pn + time + spline + time*trt01pn +
+#   spline*trt01pn + time*gfr_grp + spline*gfr_grp + trt01pn*gfr_grp +
+#   time*trt01pn*gfr_grp + spline*trt01pn*gfr_grp + -1, # Model
+#   random = list(usubjid = pdSymm(form= ~ 1 + time)), # Unstructured covariance matrix
+#   na.action=na.omit, data = gfr_c, method  = "REML",
+#   control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, opt = "optim", optimMethod = "CG")
+# )
+
 ```
 
 
