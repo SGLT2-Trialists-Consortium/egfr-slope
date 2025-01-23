@@ -310,7 +310,7 @@ gfr_c <- gfr_c  |>
 # Fit mixed effects model with unstructured residual variance-covariance matrix
 # this time with adjustment and interactions with `blglp1`
 fit_binary <- lme4::lmer(
-  aval ~ base + time * trt01pn + spline * trt01pn + time * blglp1 +
+  aval ~ base + strata + time * trt01pn + spline * trt01pn + time * blglp1 +
   spline * blglp1 + trt01pn * blglp1 + time * trt01pn * blglp1 + 
   spline * trt01pn * blglp1 - 1 + (time | usubjid), 
   data = gfr_c
